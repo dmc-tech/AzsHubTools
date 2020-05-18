@@ -1,11 +1,23 @@
 #Requires -RunAsAdministrator
 #Requires -Modules @{'ModuleName'='Microsoft.AzureStack.ReadinessChecker';'ModuleVersion'='1.2002.1111.69'}
 
-# Title   : New-AzsHubCertificates.ps1
-# Author  : Danny McDermott 
-# Version : 0.1
-# Date    : 23-04-2020
-#
+[CmdletBinding()]
+    Param(
+        [Parameter()][string]$azsregion,
+        [Parameter()][string]$azsCertDir = 'c:\azsCerts',
+        [Parameter()][String]$azsRegionFQDN,
+        [Parameter()][String]$CaServer,
+        [Parameter()][ValidateSet('AAD','ADFS')]
+            [String]$IdentitySystem,
+        [Parameter()][Switch]$AppService,
+        [Parameter()][Switch]$DBAdapter,
+        [Parameter()][Switch]$EventHubs,
+        [Parameter()][Switch]$IoTHubs,
+        [Parameter()][Switch]$SkipDeployment,
+        [Parameter()][System.Management.Automation.PSCredential]$CaCredential,
+        [Parameter()][SecureString]$pfxPassword
+    )
+
 
 $ErrorActionPreference = 'stop'
 
@@ -21,26 +33,36 @@ function new-AzsCertFolder ($AzsCert, $Path ) {
  function processCerts{
     Param(
         $hash,
-        $CoreCertPath
+        $CoreCertPath,
+        $secPfxPass
     )
         foreach ($signedCert in $hash.keys ) {
             $CTRStore = 'Cert:\LocalMachine\My\'
             $cert = Get-ChildItem -Path "$signedcertsFolder\$signedCert.crt"
-            $privCert = Import-Certificate -FilePath $cert -CertStoreLocation $CTRStore -ErrorAction Stop # get the signature and add to a hashtable? 
-            write-output ('[INFO]: Imported certificate: {0}' -f $cert)
-            write-output ('[INFO]: {0} Thumbprint: {1}' -f $signedCert, $privCert.Thumbprint)
+            $privCert = Import-Certificate -FilePath $cert -CertStoreLocation $CTRStore -ErrorAction Stop 
+            Write-Debug ('[INFO]: Imported certificate: {0}' -f $cert)
+            Write-Debug ('[INFO]: {0} Thumbprint: {1}' -f $signedCert, $privCert.Thumbprint)
             remove-item -Path $cert.FullName 
             #$certHash.Add($signedCert, @{$privCert.Thumbprint = $privCert.Subject})
 
-            $exportCertpath =('{0}\{1}\{2}.pfx' -f $CoreCertPath, $hash[$signedcert], $signedCert )
+            # Check to see if the service requiring certs needs multiple endpoints. Put in the correct directory.
+            $exportCertDir =('{0}\{1}' -f $CoreCertPath, $hash[$signedcert])
+            if (Test-Path -Path $exportCertDir -PathType Container) {
+                $exportCertpath =('{0}\{1}\{2}.pfx' -f $CoreCertPath, $hash[$signedcert], $signedCert )
+            }
+            else {
+                $exportCertpath =('{0}\{1}.pfx' -f $CoreCertPath, $signedCert )
+            }
             try{
+                Write-Debug ('[INFO]: Exporting PFX Certificate: {0} to {1}' -f $privcert, $exportCertpath)
                 Export-PfxCertificate -Cert $privCert -Password $secPfxPass -FilePath $exportCertpath -ChainOption BuildChain -NoProperties -Force -CryptoAlgorithmOption TripleDES_SHA1
             }
             catch {
                  # =< Windows 2016 does not have the crypt option
+                 Write-Debug ('[INFO]: Exporting PFX Certificate: {0} to {1}' -f $privcert, $exportCertpath)
                  Export-PfxCertificate -Cert $privCert -Password $secPfxPass -FilePath $exportCertpath -ChainOption BuildChain -NoProperties -Force 
             }
-            write-output ('[INFO]: Exported certificate: {0}' -f $exportCertpath)
+            Write-Debug ('[INFO]: Exported certificate: {0}' -f $exportCertpath)
 
         }
     }
@@ -58,7 +80,9 @@ function New-AzsHubCertificates {
         [Parameter()][Switch]$DBAdapter,
         [Parameter()][Switch]$EventHubs,
         [Parameter()][Switch]$IoTHubs,
-        [Parameter()][System.Management.Automation.PSCredential]$CaCredential
+        [Parameter()][Switch]$SkipDeployment,
+        [Parameter()][System.Management.Automation.PSCredential]$CaCredential,
+        [Parameter()][SecureString]$pfxPassword
     )
 
     $subject = 'CN=Azure Stack Hub ' # set this if required
@@ -83,8 +107,29 @@ function New-AzsHubCertificates {
     if (-not (Test-Path -Path $outputDirectory)) {
         New-Item -ItemType Directory -Path $outputDirectory
     }
+    else {
+        Write-Debug('[WARN]: Request Directory already exists: {0}' -f $outputDirectory)
+    }
 
-    New-AzsCertificateSigningRequest -certificateType Deployment -RegionName $AzsRegion -FQDN $DNSZone -OutputRequestPath $outputDirectory -IdentitySystem $IdentitySystem
+    # //TODO: Check if request directory already exists.  Script must have quit somewhere if it does
+
+    # Create 
+    if (-not ($SkipDeployment)) {
+        New-AzsCertificateSigningRequest -certificateType Deployment -RegionName $AzsRegion -FQDN $DNSZone -OutputRequestPath $outputDirectory -IdentitySystem $IdentitySystem
+    }
+    if ($AppService){
+        New-AzsCertificateSigningRequest -certificateType AppServices -RegionName $AzsRegion -FQDN $DNSZone -OutputRequestPath $OutputDirectory
+    }
+    if ($DBAdapter){
+        New-AzsCertificateSigningRequest -certificateType DBAdapter -RegionName $AzsRegion -FQDN $DNSZone -OutputRequestPath $OutputDirectory
+    }
+    if ($EventHubs){
+        New-AzsCertificateSigningRequest -certificateType EventHubs -RegionName $AzsRegion -FQDN $DNSZone -OutputRequestPath $OutputDirectory
+    }
+    if ($IoTHub){
+        New-AzsCertificateSigningRequest -certificateType IoTHub -RegionName $AzsRegion -FQDN $DNSZone -OutputRequestPath $OutputDirectory
+    }
+
 
     # Need to use the IP address, otherwise Kerberos complains.  Work out IP address for CA in the following 2 lines
     <# $hostEntry =[System.Net.Dns]::GetHostByName($caServer)
@@ -105,15 +150,15 @@ function New-AzsHubCertificates {
         foreach ($server in $servers.Split(',')) {
             # Check to see if the CA server IP already exists in WinRM
             if (($server.Trim() -eq $CAIP)) {
-                write-output ('[INFO]: Remote host {0} exists in WinRM' -f $server.Trim())
+                Write-Debug ('[INFO]: Remote host {0} exists in WinRM' -f $server.Trim())
             }
             elseif (($server.Trim() -eq '*')) {
-                write-output ('[INFO]: Remote host {0} is a wildcard' -f $server.Trim())
+                Write-Debug ('[INFO]: Remote host {0} is a wildcard' -f $server.Trim())
             }
             else {
                 # This isn't the CA IP, we want to preservce this entry
                 $serversArray += $server.Trim()
-                write-output ('[INFO]: Remote host {0} added to WinRM' -f $server.Trim())
+                Write-Debug ('[INFO]: Remote host {0} added to WinRM' -f $server.Trim())
             }
         }
         
@@ -125,7 +170,7 @@ function New-AzsHubCertificates {
     }
     else {
      $serversArray += $CAIP
-     write-output ('[INFO]: Remote host {0} added to WinRM' -f $CAIP)
+     Write-Debug ('[INFO]: Remote host {0} added to WinRM' -f $CAIP)
 
      $list = $serversArray -join ", "
     }
@@ -168,19 +213,19 @@ function New-AzsHubCertificates {
         [string]$certReqfolder = ''
     )
 
-    write-output ('[INFO]: Remote Cert Folder: {0}' -f $certReqfolder)
+    Write-Debug ('[INFO]: Remote Cert Folder: {0}' -f $certReqfolder)
     $CertReqPath = 'C:\Windows\System32\certreq.exe'
     $CertUtilPath = 'C:\Windows\System32\certutil.exe'
     $result = (Invoke-Expression -Command $CertUtilPath) | Out-String | ConvertFrom-String
     $ca = (($result.P5).Replace("'","")).Replace("``","")
     $config = (($result.P18).Replace("'","")).Replace("``","")
-    write-output ('[INFO]: Retrieved CA: {0}' -f $ca)
+    Write-Debug ('[INFO]: Retrieved CA: {0}' -f $ca)
 
     $CRTPath = $certReqfolder + "\certs"
             
     If (-not (Test-Path($CRTPath))){
             
-        new-item -Path $CRTPath -ItemType Directory
+        $null = new-item -Path $CRTPath -ItemType Directory
             
     }
 
@@ -190,11 +235,11 @@ function New-AzsHubCertificates {
     "$CRTPath\$ca.cer"
     )
 
-    write-output ('[INFO]: Retrieving Public CA Certificate')
+    Write-Debug ('[INFO]: Retrieving Public CA Certificate')
     & $CertUtilPath $params
-    write-output ('[INFO]: Retrieved Public CA Certificate')
+    Write-Debug ('[INFO]: Retrieved Public CA Certificate')
     foreach ($request in (Get-ChildItem -Path $certReqfolder -filter *.req)){
-        write-output ('[INFO]: Processing Request: {0}' -f $request.FullName)
+        Write-Debug ('[INFO]: Processing Request: {0}' -f $request.FullName)
         $command = $CertReqPath + " -config " + $config + " -attrib CertificateTemplate:RASAndIASServer -submit " + $request.FullName
         $result = (Invoke-Expression -Command $command) | Out-String | ConvertFrom-String
     
@@ -205,9 +250,12 @@ function New-AzsHubCertificates {
 
         # Retrieve the request
         
-        write-output ('[INFO]: Retrieving Signed Certificates')
+        Write-Debug ('[INFO]: Retrieving Signed Certificates')
         # .crt and .p7b
-        if (($request.BaseName).split('_')[0] -eq 'wildcard') {
+        if ($request.BaseName -match 'wildcard_sso_appservice') {
+            $certname = 'wappsvc'
+        }
+        elseif (($request.BaseName).split('_')[0] -eq 'wildcard') {
             $certname = ($request.BaseName).split('_')[1]
         }
         else {
@@ -216,25 +264,25 @@ function New-AzsHubCertificates {
         $CRTFilePath = $CRTPath + "\" + $certname + ".crt"
         $P7BFilePath = $CRTPath + "\" + $certname + ".p7b"
         $command = $CertReqPath + " -f -q -config " + $config + " -retrieve " + $id + " " + $CRTFilePath + " " + $P7BFilePath 
-        write-output ('[INFO]: Running: {0}' -f $command)
+        Write-Debug ('[INFO]: Running: {0}' -f $command)
         Invoke-Expression -Command $command
     }
     }
 
     Invoke-Command -Session $caSession -ScriptBlock $scriptblock -ArgumentList $remotefolder
     if ( -not (Test-Path -Path $signedcertsFolder)) {
-        new-item -Path $signedcertsFolder -ItemType Directory
+        $null = new-item -Path $signedcertsFolder -ItemType Directory
     }
     # Copy Signed Certs locally
 
-    write-output ('[INFO]: Copying Signed Certs from CA to Cloud Operator host.')
+    Write-Debug ('[INFO]: Copying Signed Certs from CA to Cloud Operator host.')
     Copy-Item "$remotefolder\certs\*.crt" -Destination $signedcertsFolder -FromSession $caSession -recurse -Force 
 
-    write-output ('[INFO]: Copying Public CA certificate from CA to Cloud Operator host.')
+    Write-Debug ('[INFO]: Copying Public CA certificate from CA to Cloud Operator host.')
     Copy-Item "$remotefolder\certs\*.cer" -Destination $signedcertsFolder -FromSession $caSession -recurse -Force 
 
     # Tidy up folders on the CA
-    write-output ('[INFO]: Removing Temp files on the CA server.')
+    Write-Debug ('[INFO]: Removing Temp files on the CA server.')
     invoke-command -Session $caSession -ScriptBlock {remove-item -Path "$using:remotefolder" -Recurse -Force }
 
     # Remove the remote session
@@ -242,7 +290,7 @@ function New-AzsHubCertificates {
 
     # Remove the request Dir as we're done processing those
     Remove-Item -Path $requestsFolder -Recurse -Force
-    write-output ('[INFO]: Completed processing certificate requests')
+    Write-Debug ('[INFO]: Completed processing certificate requests')
 
     #  Determine If ADFS ID system
     $ADFS = $false
@@ -255,7 +303,7 @@ function New-AzsHubCertificates {
 
     # Folder to store deployment certificates
     $CoreCertPath = "$CertPath\$IdentitySystem"
-    # //TODO: Set up Certs for other services
+    # Set up Certs for other services
     $AppSvcCertPath = "$CertPath\AppServices"
     $DBAdapterCertPath = "$CertPath\DBAdapter"
     $EVHubsCertPath = "$CertPath\EventHubs"
@@ -293,7 +341,7 @@ function New-AzsHubCertificates {
         'DBAdapter'="DBAdapter"
     }
     $EvHubEndPoints = @{
-        'eventhubs'="EventHubs"
+        'eventhub'="EventHubs"
     }
     $IotHubEndPoints = @{
         'iothub'="IoTHub"
@@ -304,33 +352,22 @@ function New-AzsHubCertificates {
         break
     }
 
-    #Create the folder structure for core deployment certs
-    new-AzsCertFolder $AzsCommmonEndpoints -Path $CoreCertPath
-    if ($ADFS) {
-        new-AzsCertFolder $AzsADFSEndpoints -Path $CoreCertPath
+    # Create a new secure password for the pfx file if not specified
+    if (-not($pfxPassword)) {
+        # Generate a random password using the system.web GeneratePassword functionality
+        Add-Type -AssemblyName System.Web 
+        $PasswordLength = 16
+        $SpecialCharCount = 1
+        $pfxPassword = [System.Web.Security.Membership]::GeneratePassword($PasswordLength, $SpecialCharCount)
+        Write-Debug ('[INFO]: PfxPassword: {0}' -f $pfxPassword)
+        $secPfxPass = ConvertTo-SecureString -AsPlainText $pfxPassword -Force
+        $pfxPassAutoGen = $true
     }
-    if ($AppService){
-        new-AzsCertFolder $AppSvcEndpoints -Path $AppSvcCertPath
+    else {
+        $secPfxPass = $pfxPassword
+        $pfxPassAutoGen = $false
+                
     }
-    if ($DBAdapter){
-        mkdir -Path $DBAdapterCertPath
-    }
-    if ($EventHubs){
-        mkdir -Path $EVHubsCertPath
-    }
-    if ($IoTHub){
-        mkdir -Path $IoTHubCertPath
-    }
-
-
-
-    # Generate a random password using the system.web GeneratePassword functionality
-    Add-Type -AssemblyName System.Web 
-    $PasswordLength = 16
-    $SpecialCharCount = 1
-    $pfxPassword = [System.Web.Security.Membership]::GeneratePassword($PasswordLength, $SpecialCharCount)
-    $secPfxPass = ConvertTo-SecureString -AsPlainText $pfxPassword -Force
-
     # Process signed responses from CA
     $script:certHash = @{}
     $signedcertsFolder = $certpath + '\signedcerts'
@@ -343,9 +380,9 @@ function New-AzsHubCertificates {
     $publicCAFile = Get-ChildItem -Path "$signedcertsFolder\*.cer"
 
     If ($publicCAFile.count -eq 1) {
-       write-output ('[INFO]: Public CA Cert found: {0} ' -f $publicCAFile.Name)        
+       Write-Debug ('[INFO]: Public CA Cert found: {0} ' -f $publicCAFile.Name)        
        Import-Certificate -FilePath $publicCAFile.FullName -CertStoreLocation Cert:\LocalMachine\Root -Verbose         
-       write-output ('[INFO]: Imported Public CA Cert: {0} ' -f $publicCAFile.Name)
+       Write-Debug ('[INFO]: Imported Public CA Cert: {0} ' -f $publicCAFile.Name)
     } 
     else {
         # Decide what to do with no file or multiple .cer files ...
@@ -357,40 +394,80 @@ function New-AzsHubCertificates {
         }
     }
 
- 
-    processCerts -hash $AzsCommmonEndpoints -CoreCertPath $CoreCertPath
+    #Create the folder structure for core deployment certs
+    new-AzsCertFolder $AzsCommmonEndpoints -Path $CoreCertPath
+    # Process the Certificates
+    if (-not ($SkipDeployment)) {
+        processCerts -hash $AzsCommmonEndpoints -CoreCertPath $CoreCertPath -secPfxPass $secPfxPass
+    }
     if ($adfs) {
-        processCerts -hash $AzsADFSEndpoints -CoreCertPath $CoreCertPath
+        new-AzsCertFolder $AzsADFSEndpoints -Path $CoreCertPath
+        processCerts -hash $AzsADFSEndpoints -CoreCertPath $CoreCertPath -secPfxPass $secPfxPass
+    }
+    if ($AppService){
+        new-AzsCertFolder $AppSvcEndpoints -Path $AppSvcCertPath
+        processCerts -hash $AppSvcEndpoints -CoreCertPath $AppSvcCertPath -secPfxPass $secPfxPass
+    }
+    if ($DBAdapter){
+        if (-not (Test-Path -Path $DBAdapterCertPath -PathType Container)) {
+            $null = mkdir -Path $DBAdapterCertPath
+        }
+        processCerts -hash $DBAdapterEndpoints -CoreCertPath $DBAdapterCertPath -secPfxPass $secPfxPass
+    }
+    if ($EventHubs){
+        if (-not (Test-Path -Path $EVHubsCertPath -PathType Container)) {
+            $null = mkdir -Path $EVHubsCertPath
+        }
+        processCerts -hash $EvHubEndPoints -CoreCertPath $EVHubsCertPath -secPfxPass $secPfxPass
+    }
+    if ($IoTHub){
+        if (-not (Test-Path -Path $IoTHubCertPath -PathType Container)) {
+            $null = mkdir -Path $IoTHubCertPath
+        }
+        processCerts -hash $IotHubEndPoints -CoreCertPath $IoTHubCertPath -secPfxPass $secPfxPass
     }
 
     # Test validity of certificates using Microsoft.AzureStack.ReadinessChecker module.
-    Invoke-AzsCertificateValidation -CertificateType Deployment -CertificatePath $CoreCertPath -pfxPassword $secPfxPass -RegionName $AzsRegion -FQDN $DNSZone -IdentitySystem $IdentitySystem 
+    if (-not ($SkipDeployment)) {
+        Invoke-AzsCertificateValidation -CertificateType Deployment -CertificatePath $CoreCertPath -pfxPassword $secPfxPass -RegionName $AzsRegion -FQDN $DNSZone -IdentitySystem $IdentitySystem 
+    }
+    if ($AppService){
+        Invoke-AzsCertificateValidation -CertificateType AppServices -CertificatePath $AppSvcCertPath -pfxPassword $secPfxPass -RegionName $AzsRegion -FQDN $DNSZone
+    }
+    if ($DBAdapter){
+        Invoke-AzsCertificateValidation -CertificateType DBAdapter -CertificatePath $DBAdapterCertPath -pfxPassword $secPfxPass -RegionName $AzsRegion -FQDN $DNSZone
+    }
+    if ($EventHubs){
+        Invoke-AzsCertificateValidation -CertificateType EventHubs -CertificatePath $EVHubsCertPath -pfxPassword $secPfxPass -RegionName $AzsRegion -FQDN $DNSZone
+    }
+    if ($IoTHub){
+        Invoke-AzsCertificateValidation -CertificateType IoTHub -CertificatePath $IoTHubCertPath -pfxPassword $secPfxPass -RegionName $AzsRegion -FQDN $DNSZone
+    }
 
     # Tidy up
     Remove-Item -Path $signedcertsFolder -Recurse -Force
 
-    Write-Output ('[INFO]: PfxPassword: {0}' -f $pfxPassword )
-    Return $pfxPassword
-    # //TODO: capability to store password in KeyVault?
+    if ($pfxPassAutoGen) {
+        Write-Debug ('[INFO]: PfxPassword: {0}' -f $pfxPassword )
+        Return $pfxPassword
+    }
 }
 
-#Choose how you want to specify your credentials.  Either:
-# 1. Specify in the script...
-$caPasswordSecure = 'P@ssword*' | ConvertTo-SecureString -AsPlainText -Force
-$causer='domain\administrator'
-$caCredential = New-Object System.Management.Automation.PSCredential ($caUser,$caPasswordSecure)
-# 2. or via get-credential
-$caCredential = get-credential
 
-# Name of the Azure SAtck Hub region
-$azsRegion = 'azs1'
-# FQDN of the domain that will host the Azure Satck Hub region
-$FQDN = 'dmctech.local'
-# Specify the IP address to avoid kerberos issues!
-$CertServer = '192.168.1.175'
+$params =@{
+    azsregion = $azsRegion
+    azsRegionFQDN = $FQDN
+    CaServer = $CertServer
+    IdentitySystem = $IdentitySystem
+    CaCredential = $caCredential
+    AppService = $true
+    DBAdapter = $true
+    EventHubs = $true
+    IoTHubs = $true
+    SkipDeployment = $false
+    pfxPassword = $pfxPassword
 
-# Choose the Identity system type to generate certificates for
-$IdentitySystem = 'AAD' # ADFS or AAD
+}
 
 
-New-AzsHubCertificates -azsregion $azsRegion -azsRegionFQDN $FQDN -CaServer $CertServer -IdentitySystem $IdentitySystem -CaCredential $caCredential
+New-AzsHubCertificates @params
