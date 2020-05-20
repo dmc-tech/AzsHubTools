@@ -1,6 +1,12 @@
 #Requires -RunAsAdministrator
 #Requires -Modules @{'ModuleName'='Microsoft.AzureStack.ReadinessChecker';'ModuleVersion'='1.2002.1111.69'}
 
+# Title   : New-AzsHubCertificates.ps1
+# Author  : Danny McDermott 
+# Version : 0.1
+# Date    : 23-04-2020
+#
+
 [CmdletBinding()]
     Param(
         [Parameter()][string]$azsregion,
@@ -454,19 +460,23 @@ function New-AzsHubCertificates {
 }
 
 
+
 $params =@{
     azsregion = $azsRegion
     azsRegionFQDN = $FQDN
     CaServer = $CertServer
     IdentitySystem = $IdentitySystem
     CaCredential = $caCredential
-    AppService = $true
-    DBAdapter = $true
-    EventHubs = $true
-    IoTHubs = $true
-    SkipDeployment = $false
-    pfxPassword = $pfxPassword
+    AppService = $AppService
+    DBAdapter = $DBAdapter
+    EventHubs = $EventHubs
+    IoTHubs = $IoTHubs
+    SkipDeployment = $SkipDeployment
 
+}
+
+if ($pfxPassword) {
+    $params.Add('pfxPassword', $pfxPassword)
 }
 
 
