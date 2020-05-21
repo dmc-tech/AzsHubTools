@@ -350,7 +350,7 @@ function New-AzsHubCertificates {
         'eventhub'="EventHubs"
     }
     $IotHubEndPoints = @{
-        'iothub'="IoTHub"
+        'mgmtiothub'="IoTHub"
     }
 
     if (-not (Test-Path -Path $CertPath  -PathType Container)) {
