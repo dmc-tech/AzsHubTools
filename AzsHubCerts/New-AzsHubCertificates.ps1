@@ -18,7 +18,7 @@
         [Parameter()][Switch]$AppService,
         [Parameter()][Switch]$DBAdapter,
         [Parameter()][Switch]$EventHubs,
-        [Parameter()][Switch]$IoTHubs,
+        [Parameter()][Switch]$IoTHub,
         [Parameter()][Switch]$SkipDeployment,
         [Parameter()][System.Management.Automation.PSCredential]$CaCredential,
         [Parameter()][SecureString]$pfxPassword
@@ -85,7 +85,7 @@ function New-AzsHubCertificates {
         [Parameter()][Switch]$AppService,
         [Parameter()][Switch]$DBAdapter,
         [Parameter()][Switch]$EventHubs,
-        [Parameter()][Switch]$IoTHubs,
+        [Parameter()][Switch]$IoTHub,
         [Parameter()][Switch]$SkipDeployment,
         [Parameter()][System.Management.Automation.PSCredential]$CaCredential,
         [Parameter()][SecureString]$pfxPassword
@@ -470,7 +470,7 @@ $params =@{
     AppService = $AppService
     DBAdapter = $DBAdapter
     EventHubs = $EventHubs
-    IoTHubs = $IoTHubs
+    IoTHubs = $IoTHub
     SkipDeployment = $SkipDeployment
 
 }
