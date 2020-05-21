@@ -4,15 +4,13 @@ $PasswordLength = 16
 $SpecialCharCount = 1
 $pfxPasswd = [System.Web.Security.Membership]::GeneratePassword($PasswordLength, $SpecialCharCount)
 #$pfxPasswd ='<your passsword>'
-Write-Debug ('[INFO]: PfxPassword: {0}' -f $pfxPassrd)
 $secPfxPass = ConvertTo-SecureString -AsPlainText $pfxPasswd -Force
-
 
 
 #Choose how you want to specify your credentials.  Either:
 
 # 1. Specify in the script...
-$caPasswordSecure = '<CA PAssword>' | ConvertTo-SecureString -AsPlainText -Force
+$caPasswordSecure = '<CA Password>' | ConvertTo-SecureString -AsPlainText -Force
 $causer='domain\administrator'
 $caCredential = New-Object System.Management.Automation.PSCredential ($caUser,$caPasswordSecure)
 
@@ -26,7 +24,7 @@ $azsRegion = 'azs1'
 $FQDN = '<FQDN>'
 
 # Specify the IP address to avoid kerberos issues!
-$CertServer = '<IP Address>'
+$CertServer = '<CA IP>'
 
 # Choose the Identity system type to generate certificates for
 $IdentitySystem = 'AAD' # ADFS or AAD
@@ -40,7 +38,7 @@ $params =@{
     AppService = $true
     DBAdapter = $true
     EventHubs = $true
-    IoTHubs = $true
+    IoTHub = $true
     SkipDeployment = $false
     pfxPassword = $secPfxPass
   
@@ -49,3 +47,5 @@ $params =@{
 cd $PSScriptRoot
 
 .\New-AzsHubCertificates.ps1 @params
+
+Write-Output ('[INFO]: PfxPassword: {0}' -f $pfxPassrd)
