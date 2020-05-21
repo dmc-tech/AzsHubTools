@@ -470,7 +470,7 @@ $params =@{
     AppService = $AppService
     DBAdapter = $DBAdapter
     EventHubs = $EventHubs
-     = $IoTHub
+    IoTHub = $IoTHub
     SkipDeployment = $SkipDeployment
 
 }
