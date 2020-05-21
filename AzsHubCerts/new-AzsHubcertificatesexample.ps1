@@ -48,4 +48,4 @@ cd $PSScriptRoot
 
 .\New-AzsHubCertificates.ps1 @params
 
-Write-Output ('[INFO]: PfxPassword: {0}' -f $pfxPassrd)
+Write-Output ('[INFO]: PfxPassword: {0}' -f $pfxPasswd)
