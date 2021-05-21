@@ -3,66 +3,55 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "location": {
+            "defaultValue": "[resourceGroup().location]",
             "type": "String"
         },
-        "virtualMachineName": {
+        "virtualMachineName": {          
             "type": "String"
         },
         "virtualMachineSize": {
+            "defaultValue": "Standard_F4s_v2",
             "type": "String"
         },
         "adminUsername": {
+            "defaultValue": "azureuser",
             "type": "String"
         },
         "virtualNetworkName": {
-            "type": "String"
-        },
-        "networkInterfaceName": {
+            "defaultValue": "ghRunner-Vnet",
             "type": "String"
         },
         "diskSizeGB": {
-            "type": "String"
-        },
-        "networkSecurityGroupName": {
+            "defaultValue": 128,
             "type": "String"
         },
         "adminPublicKey": {
             "type": "String"
         },
-        "diagnosticsStorageAccountName": {
-            "type": "String"
-        },
-        "diagnosticsStorageAccountId": {
-            "type": "String"
-        },
-        "diagnosticsStorageAccountType": {
-            "type": "String"
-        },
-        "diagnosticsStorageAccountKind": {
-            "type": "String"
-        },
         "addressPrefix": {
+            "defaultvalue": "10.0.0.0/24",
             "type": "String"
         },
         "subnetName": {
+            "defaultValue": "default",
             "type": "String"
         },
         "subnetPrefix": {
-            "type": "String"
-        },
-        "publicIpAddressName": {
-            "type": "String"
-        },
-        "publicIpAddressType": {
-            "type": "String"
-        },
-        "publicIpAddressSku": {
+            "defaultvalue": "10.0.0.0/24",
             "type": "String"
         }
     },
     "variables": {
-        "vnetId": "[resourceId('gituHubRunner','Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
-        "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]"
+        "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+        "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]",
+        "networkInterfaceName": "[concat(parameters('virtualMachineName'),'-',uniqueString(resourceGroup().id))]",
+        "diagnosticsStorageAccountName": "[concat('diag',replace(parameters('virtualMachineName'),'-',''),uniqueString(resourceGroup().id))]",
+        "diagnosticsStorageAccountType": "Standard_LRS",
+        "diagnosticsStorageAccountKind": "Storage",
+        "publicIpAddressName": "[concat(parameters('virtualMachineName'),'-ip')]",
+        "networkSecurityGroupName": "[concat(parameters('virtualMachineName'),'-nsg')]",
+        "publicIpAddressType": "Dynamic",
+        "publicIpAddressSku": "publicIpAddressSku"
     },
     "resources": [
         {
@@ -108,29 +97,29 @@
                 "networkProfile": {
                     "networkInterfaces": [
                         {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaceName'))]"
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
                         }
                     ]
                 },
                 "diagnosticsProfile": {
                     "bootDiagnostics": {
                         "enabled": true,
-                        "storageUri": "[concat('https://', parameters('diagnosticsStorageAccountName'), '.blob.ppe1.stackpoc.com/')]"
+                        "storageUri": "[concat(reference(concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).primaryEndpoints.blob))]"    
                     }
                 }
             },
             "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', parameters('networkInterfaceName'))]",
-                "[concat('Microsoft.Storage/storageAccounts/', parameters('diagnosticsStorageAccountName'))]"
+                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]",
+                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
             ]
         },
         {
             "type": "Microsoft.Storage/storageAccounts",
             "sku": {
-                "name": "[parameters('diagnosticsStorageAccountType')]"
+                "name": "[variables('diagnosticsStorageAccountType')]"
             },
-            "kind": "[parameters('diagnosticsStorageAccountKind')]",
-            "name": "[parameters('diagnosticsStorageAccountName')]",
+            "kind": "[variables('diagnosticsStorageAccountKind')]",
+            "name": "[variables('diagnosticsStorageAccountName')]",
             "apiVersion": "2017-10-01",
             "location": "[parameters('location')]",
             "properties": {}
@@ -158,7 +147,7 @@
         },
         {
             "type": "Microsoft.Network/networkInterfaces",
-            "name": "[parameters('networkInterfaceName')]",
+            "name": "[variables('networkInterfaceName')]",
             "apiVersion": "2017-10-01",
             "location": "[parameters('location')]",
             "properties": {
@@ -171,36 +160,36 @@
                             },
                             "privateIPAllocationMethod": "Dynamic",
                             "publicIpAddress": {
-                                "id": "[resourceId('gituHubRunner','Microsoft.Network/publicIpAddresses', parameters('publicIpAddressName'))]"
+                                "id": "[resourceId('gituHubRunner','Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
                             }
                         }
                     }
                 ],
                 "networkSecurityGroup": {
-                    "id": "[resourceId('gituHubRunner', 'Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroupName'))]"
+                    "id": "[resourceId('gituHubRunner', 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
                 }
             },
             "dependsOn": [
                 "[concat('Microsoft.Network/virtualNetworks/', parameters('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', parameters('publicIpAddressName'))]",
-                "[concat('Microsoft.Network/networkSecurityGroups/', parameters('networkSecurityGroupName'))]"
+                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName'))]",
+                "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]"
             ]
         },
         {
             "type": "Microsoft.Network/publicIpAddresses",
             "sku": {
-                "name": "[parameters('publicIpAddressSku')]"
+                "name": "[variables('publicIpAddressSku')]"
             },
-            "name": "[parameters('publicIpAddressName')]",
+            "name": "[variables('publicIpAddressName')]",
             "apiVersion": "2017-10-01",
             "location": "[parameters('location')]",
             "properties": {
-                "publicIpAllocationMethod": "[parameters('publicIpAddressType')]"
+                "publicIpAllocationMethod": "[variables('publicIpAddressType')]"
             }
         },
         {
             "type": "Microsoft.Network/networkSecurityGroups",
-            "name": "[parameters('networkSecurityGroupName')]",
+            "name": "[variables('networkSecurityGroupName')]",
             "apiVersion": "2017-10-01",
             "location": "[parameters('location')]",
             "properties": {
