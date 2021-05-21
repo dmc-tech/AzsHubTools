@@ -1,0 +1,34 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachineName": {
+            "value": "gh-runner-001"
+        },
+        "virtualMachineSize": {
+            "value": "Standard_F4s_v2"
+        },
+        "adminUsername": {
+            "value": "azureuser"
+        },
+        "virtualNetworkName": {
+            "value": "ghRunner-Vnet"
+        },
+        "diskSizeGB": {
+            "value": 128
+        },
+        "adminPublicKey": {
+            "value": "ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAhCbzzMN2HogTwv7mw7gkBvkXbo9e7Ei/D0ulTxTcE4xoZl+oIUYXBQRObF1xbqXe6EnPrRh5JGGa+p8UX06nv6gOtFe/6aRMLUg4+/AVdjvTcE/pu70fhigqENJHKvqtOxZPSbqbWehfX+YdVbhd+W2VzbCDZzO24Pwp875nvcRcDG8Bqp2kIL9p0EtUPjW3eE7S8d3kJGnvqZOUiomDQyH2itDv2fBJv+n45gMOE/eyANf4p3TYsOJ7uKSR18qROajopS/pT+1XDrrdlfth+wW+qUlEd50zHaB3tnoIt7uU27HfHl0lUaVzBhR8oc0XfS/TthjtZVSfgFp3cNlA+w=="
+        },
+        "addressPrefix": {
+            "value": "10.0.0.0/24"
+        },
+        "subnetName": {
+            "value": "default"
+        },
+        "subnetPrefix": {
+            "value": "10.0.0.0/24"
+        }
+       
+    }
+}
