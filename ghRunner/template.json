@@ -66,13 +66,14 @@
         "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
         "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]",
         "networkInterfaceName": "[concat(parameters('virtualMachineName'),'-',uniqueString(resourceGroup().id))]",
-        "diagnosticsStorageAccountName": "[concat('diag',replace(parameters('virtualMachineName'),'-',''),uniqueString(resourceGroup().id))]",
+        "uniqueDiagnosticsStorageAccountName": "[concat('diag',replace(parameters('virtualMachineName'),'-',''),uniqueString(resourceGroup().id))]",
+        "diagnosticsStorageAccountName": "[substring(variables('uniqueDiagnosticsStorageAccountName'),0,23)]",
         "diagnosticsStorageAccountType": "Standard_LRS",
         "diagnosticsStorageAccountKind": "Storage",
         "publicIpAddressName": "[concat(parameters('virtualMachineName'),'-ip')]",
         "networkSecurityGroupName": "[concat(parameters('virtualMachineName'),'-nsg')]",
         "publicIpAddressType": "Dynamic",
-        "publicIpAddressSku": "publicIpAddressSku"
+        "publicIpAddressSku": "Basic"
     },
     "resources": [
         {
@@ -125,7 +126,7 @@
                 "diagnosticsProfile": {
                     "bootDiagnostics": {
                         "enabled": true,
-                        "storageUri": "[concat(reference(concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).primaryEndpoints.blob))]"    
+                        "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('diagnosticsStorageAccountName'))).primaryEndpoints.blob]"
                     }
                 }
             },
@@ -204,13 +205,13 @@
                             },
                             "privateIPAllocationMethod": "Dynamic",
                             "publicIpAddress": {
-                                "id": "[resourceId('gituHubRunner','Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
                             }
                         }
                     }
                 ],
                 "networkSecurityGroup": {
-                    "id": "[resourceId('gituHubRunner', 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
                 }
             },
             "dependsOn": [
