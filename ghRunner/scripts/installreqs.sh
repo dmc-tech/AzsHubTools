@@ -2,12 +2,13 @@
 #!/bin/bash
 set -x #Debug
 
-while getopts r:t: option
+while getopts r:t:o: option
 do
   case "${option}"
   in
-    r) REPONAME=${OPTARG};;
+    r) REPO=${OPTARG};;
     t) TOKEN=${OPTARG};;
+    o) OWNER=${OPTARG};;
   esac
 done
 
@@ -28,6 +29,10 @@ sudo snap install yq -y
 # Install sipcalc
 sudo apt-get update
 sudo apt-get install sipcalc -y
+
+#Install jq
+sudo apt-get update
+sudo apt install jq -y
 
 # Install Docker
 sudo apt-get update
@@ -70,10 +75,13 @@ mkdir actions-runner && cd actions-runner # Download the latest runner package
 curl -o actions-runner-linux-x64-2.277.1.tar.gz -L https://github.com/actions/runner/releases/download/v2.277.1/actions-runner-linux-x64-2.277.1.tar.gz# Extract the installer
 tar xzf ./actions-runner-linux-x64-2.277.1.tar.gz
 
-# ./config.sh --url https://github.com/${REPONAME} --token <token>
+payload=$(curl -sX POST -H "Authorization: token ${TOKEN}"  https://api.github.com/repos/${OWNER}/${REPO}/actions/runners/registration-token)
+export RUNNER_TOKEN=$(echo $payload | jq .token --raw-output)
 
-#sudo ./svc.sh install
-#sudo ./svc.sh start
+ ./config.sh --url https://github.com/${REPO} --token ${RUNNER_TOKEN}
+
+sudo ./svc.sh install
+sudo ./svc.sh start
 
 
 
