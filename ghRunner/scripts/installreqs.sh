@@ -71,8 +71,10 @@ git --version
 
 
 #Install GitHub Runner Agent
-mkdir actions-runner && cd actions-runner # Download the latest runner package
-curl -o actions-runner-linux-x64-2.277.1.tar.gz -L https://github.com/actions/runner/releases/download/v2.277.1/actions-runner-linux-x64-2.277.1.tar.gz# Extract the installer
+mkdir actions-runner && cd actions-runner 
+# Download the latest runner package
+curl -o actions-runner-linux-x64-2.277.1.tar.gz -L https://github.com/actions/runner/releases/download/v2.277.1/actions-runner-linux-x64-2.277.1.tar.gz
+# Extract the installer
 tar xzf ./actions-runner-linux-x64-2.277.1.tar.gz
 
 payload=$(curl -sX POST -H "Authorization: token ${TOKEN}"  https://api.github.com/repos/${OWNER}/${REPO}/actions/runners/registration-token)
