@@ -6,7 +6,8 @@
             "defaultValue": "[resourceGroup().location]",
             "type": "String"
         },
-        "virtualMachineName": {          
+        "virtualMachineName": {
+            "defaultValue": "gh-runner-003",          
             "type": "String"
         },
         "virtualMachineSize": {
@@ -23,22 +24,31 @@
         },
         "diskSizeGB": {
             "defaultValue": 128,
-            "type": "String"
+            "type": "int"
         },
         "adminPublicKey": {
             "type": "String"
         },
         "addressPrefix": {
-            "defaultvalue": "10.0.0.0/24",
-            "type": "String"
+            "defaultValue": "10.2.0.0/24",
+            "type": "String",
+            "metadata": {
+                "description": "The Virtual Network Address space range, in CIDR notation"
+            }
         },
         "subnetName": {
             "defaultValue": "default",
-            "type": "String"
+            "type": "String",
+            "metadata": {
+                "description": "The Virtual Network Address subnet name"
+            }
         },
         "subnetPrefix": {
-            "defaultvalue": "10.0.0.0/24",
-            "type": "String"
+            "defaultValue": "10.2.0.0/24",
+            "type": "String",
+            "metadata": {
+                "description": "The Virtual Network subnet address range, in CIDR notation"
+            }
         },
         "_artifactsLocation": {
             "defaultValue": "https://raw.githubusercontent.com/dmc-tech/AzsHubTools/main/ghRunner",
@@ -54,11 +64,25 @@
                 "description": "The sasToken required to access _artifactsLocation.  When the template is deployed using the accompanying scripts, a sasToken will be automatically generated."
             }
         },
-        "commandToExecute": {
-            "type": "string",
-            "defaultValue": "sh installreqs.sh",
+        "gitHubPat": {
+            "type": "securestring",
+            "defaultValue":"",
             "metadata": {
-                "description": "The command to execute."
+                "description": "Persopnal Access Token used to access GitHub"
+            }
+        },
+        "gitHubRepo": {
+            "type": "string",
+            "defaultValue": "AzsHubTools",
+            "metadata": {
+                "description": "GitHub Repo to create the Self Hosted Runner"
+            }
+        },
+        "gitHubOwner": {
+            "type": "string",
+            "defaultValue": "dmc-tech",
+            "metadata": {
+                "description": "GitHub Owner or Organisation where the repo is located for the Runner"
             }
         }
     },
@@ -73,7 +97,9 @@
         "publicIpAddressName": "[concat(parameters('virtualMachineName'),'-ip')]",
         "networkSecurityGroupName": "[concat(parameters('virtualMachineName'),'-nsg')]",
         "publicIpAddressType": "Dynamic",
-        "publicIpAddressSku": "Basic"
+        "publicIpAddressSku": "Basic",
+        "scriptURI": "[concat(parameters('_artifactsLocation'), '/scripts/installreqs.sh', parameters('_artifactsLocationSasToken'))]",
+        "commandToExecute": "[concat('sh installreqs.sh -o', parameters('gitHubOwner'), ' -r ', parameters('gitHubRepo') ,' -t ', parameters('gitHubPat') )]"
     },
     "resources": [
         {
@@ -137,8 +163,8 @@
         },
          {
             "type": "Microsoft.Compute/virtualMachines/extensions",
-            "name": "[concat(parameters('virtualMachineName'),'/installcustomscript')]",
-            "apiVersion": "2015-05-01-preview",
+            "name": "[concat(parameters('virtualMachineName'),'/ghrunnerprereqs')]",
+            "apiVersion": "2020-06-01",
             "location": "[parameters('location')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]"
@@ -148,13 +174,12 @@
                 "type": "CustomScript",
                 "typeHandlerVersion": "2.0",
                 "autoUpgradeMinorVersion": true,
-                "settings": {
+                "settings": {},
+                "protectedSettings": {
                     "fileUris": [
-                        "[uri(parameters('_artifactsLocation'), concat('scripts/installreqs.sh', parameters('_artifactsLocationSasToken')))]"
+                        "[variables('scriptURI')]"
                     ],
-                    "protectedSettings": {
-                        "commandToExecute": "[parameters('commandToExecute')]"
-                    }
+                    "commandToExecute": "[variables('commandToExecute')]"
                 }
             }
         },
@@ -262,6 +287,10 @@
         "adminUsername": {
             "type": "String",
             "value": "[parameters('adminUsername')]"
+        },
+        "scriptLocation": {
+            "type": "String",
+            "value": "[variables('scriptURI')]"
         }
     }
 }

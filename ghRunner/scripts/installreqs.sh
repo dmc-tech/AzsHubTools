@@ -2,13 +2,15 @@
 #!/bin/bash
 set -x #Debug
 
-while getopts r:t:o: option
+GITHUB_RUNNER_VERSION='2.277.1'
+while getopts r:t:o:v: option
 do
   case "${option}"
   in
     r) REPO=${OPTARG};;
     t) TOKEN=${OPTARG};;
     o) OWNER=${OPTARG};;
+    v) GITHUB_RUNNER_VERSION=${OPTARG};;
   esac
 done
 
@@ -70,23 +72,31 @@ sudo apt-get install git -y
 git --version
 
 
+#Create github user
+useradd -m github
+
+sudo usermod -aG  github github
+echo "%sudo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+cd /home/github
+
 #Install GitHub Runner Agent
-mkdir actions-runner && cd actions-runner 
+mkdir actions-runner  
+chown gihub:github actions-runner/
+cd actions-runner 
 # Download the latest runner package
-curl -o actions-runner-linux-x64-2.277.1.tar.gz -L https://github.com/actions/runner/releases/download/v2.277.1/actions-runner-linux-x64-2.277.1.tar.gz
+curl -o actions-runner-linux-x64-${GITHUB_RUNNER_VERSION}.tar.gz -L https://github.com/actions/runner/releases/download/v${GITHUB_RUNNER_VERSION}/actions-runner-linux-x64-${GITHUB_RUNNER_VERSION}.tar.gz
 # Extract the installer
-tar xzf ./actions-runner-linux-x64-2.277.1.tar.gz
+tar xzf ./actions-runner-linux-x64-${GITHUB_RUNNER_VERSION}.tar.gz
 
 payload=$(curl -sX POST -H "Authorization: token ${TOKEN}"  https://api.github.com/repos/${OWNER}/${REPO}/actions/runners/registration-token)
 export RUNNER_TOKEN=$(echo $payload | jq .token --raw-output)
 
- ./config.sh --url https://github.com/${OWNER}/${REPO} --token ${RUNNER_TOKEN}
 
-sudo ./svc.sh install
-sudo ./svc.sh start
+sudo su - github -c "cd /home/github/actions-runner && ./config.sh --unattended --url https://github.com/${OWNER}/${REPO} --token ${RUNNER_TOKEN} --name $(hostname) --replace"
+sudo su - github -c "cd /home/github/actions-runner && ./run.sh --url https://github.com/${OWNER}/${REPO} --pat ${TOKEN}"
+sudo su - github -c "cd /home/github/actions-runner && sudo ./svc.sh install && sudo ./svc.sh start"
 
-#Debug - check what folder stuff is being put in...
-find . | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
 
 
 
