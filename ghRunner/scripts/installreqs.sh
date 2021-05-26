@@ -80,10 +80,13 @@ tar xzf ./actions-runner-linux-x64-2.277.1.tar.gz
 payload=$(curl -sX POST -H "Authorization: token ${TOKEN}"  https://api.github.com/repos/${OWNER}/${REPO}/actions/runners/registration-token)
 export RUNNER_TOKEN=$(echo $payload | jq .token --raw-output)
 
- ./config.sh --url https://github.com/${REPO} --token ${RUNNER_TOKEN}
+ ./config.sh --url https://github.com/${OWNER}/${REPO} --token ${RUNNER_TOKEN}
 
 sudo ./svc.sh install
 sudo ./svc.sh start
+
+#Debug - check what folder stuff is being put in...
+find . | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
 
 
 
