@@ -94,7 +94,7 @@ export RUNNER_TOKEN=$(echo $payload | jq .token --raw-output)
 
 
 sudo su - github -c "cd /home/github/actions-runner && ./config.sh --unattended --url https://github.com/${OWNER}/${REPO} --token ${RUNNER_TOKEN} --name $(hostname) --replace"
-sudo su - github -c "cd /home/github/actions-runner && ./run.sh --url https://github.com/${OWNER}/${REPO} --pat ${TOKEN}"
+sudo su - github -c "cd /home/github/actions-runner && ./run.sh --test --url https://github.com/${OWNER}/${REPO} --pat ${TOKEN}"
 sudo su - github -c "cd /home/github/actions-runner && sudo ./svc.sh install && sudo ./svc.sh start"
 
 
