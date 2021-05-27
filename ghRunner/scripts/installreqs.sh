@@ -75,7 +75,7 @@ git --version
 #Create github user
 useradd -m github
 
-sudo usermod -aG  github github
+sudo usermod -aG  sudo github
 echo "%sudo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 cd /home/github
