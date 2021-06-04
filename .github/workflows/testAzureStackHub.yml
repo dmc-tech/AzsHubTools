@@ -1,0 +1,32 @@
+on: 
+  workflow_dispatch:
+    inputs:
+      subscription:
+        description: 'Azure Stack Hub User subscription'
+        required: true
+        default: 'TenantSubscription'
+
+name: Test GitHub Runner in an Azure Stack Hub environment
+
+env:
+  ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
+
+jobs: 
+  azurestackhub-test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@main
+      - name: Login to AzureStackHub with CLI
+        uses: azure/login@releases/v1
+        with:
+          creds: ${{ secrets.AZURESTACKHUB_CREDENTIALS }}
+          environment: 'AzureStack'
+          enable-AzPSSession: false
+
+      - name: Run Azure CLI Script Against AzureStackHub
+        run: |
+          hostname
+          subId=$(az account show --subscription ${{ github.event.inputs.subscription }} --query id -o tsv)
+          az account set --subscription ${{ github.event.inputs.subscription }}
+
+          az group list --output table
