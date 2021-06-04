@@ -7,7 +7,7 @@
             "type": "String"
         },
         "virtualMachineName": {
-            "defaultValue": "gh-runner-003",          
+            "defaultValue": "gh-runner-001",          
             "type": "String"
         },
         "virtualMachineSize": {
@@ -30,7 +30,7 @@
             "type": "String"
         },
         "addressPrefix": {
-            "defaultValue": "10.2.0.0/24",
+            "defaultValue": "10.0.0.0/24",
             "type": "String",
             "metadata": {
                 "description": "The Virtual Network Address space range, in CIDR notation"
@@ -44,7 +44,7 @@
             }
         },
         "subnetPrefix": {
-            "defaultValue": "10.2.0.0/24",
+            "defaultValue": "10.0.0.0/24",
             "type": "String",
             "metadata": {
                 "description": "The Virtual Network subnet address range, in CIDR notation"
@@ -68,19 +68,19 @@
             "type": "securestring",
             "defaultValue":"",
             "metadata": {
-                "description": "Persopnal Access Token used to access GitHub"
+                "description": "Personal Access Token used to access GitHub"
             }
         },
         "gitHubRepo": {
             "type": "string",
-            "defaultValue": "AzsHubTools",
+            "defaultValue": "",
             "metadata": {
                 "description": "GitHub Repo to create the Self Hosted Runner"
             }
         },
         "gitHubOwner": {
             "type": "string",
-            "defaultValue": "dmc-tech",
+            "defaultValue": "",
             "metadata": {
                 "description": "GitHub Owner or Organisation where the repo is located for the Runner"
             }
